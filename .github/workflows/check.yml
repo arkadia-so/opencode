@@ -7,6 +7,11 @@ on:
     branches: [dev, beta]
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
+    inputs:
+      cache:
+        description: outrun's cache namespace (ARK-81 bench; a fresh one is a cold cache)
+        type: string
+        default: outrun
 
 concurrency:
   group: ${{ case(github.ref == 'refs/heads/dev', format('{0}-{1}', github.workflow, github.run_id), format('{0}-{1}', github.workflow, github.event.pull_request.number || github.ref)) }}
@@ -14,7 +19,7 @@ concurrency:
 
 env:
   OUTRUN_CACHE_URL: https://turbo-cache.arkadia.so
-  OUTRUN_CACHE_TEAM: outrun
+  OUTRUN_CACHE_TEAM: ${{ inputs.cache || 'outrun' }}
 
 jobs:
   check:
