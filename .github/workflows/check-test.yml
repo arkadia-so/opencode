@@ -37,8 +37,8 @@ env:
   OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: "false"
 
 jobs:
-  # outrun (ARK-81): every unit is looked up once here. The test shards, the checks, the build and the browser suites
-  # start only for what missed; when everything hit, no other job starts.
+  # outrun (ARK-81): every test file is looked up once here, and the test shards start only for what missed. The
+  # checks, the build and the browser suites start beside it and each looks its own command up.
   plan:
     name: plan
     if: ${{ !github.event.pull_request.draft }}
@@ -46,10 +46,6 @@ jobs:
     outputs:
       runners: ${{ steps.plan.outputs.runners }}
       matrix: ${{ steps.plan.outputs.matrix }}
-      checks: ${{ steps.plan.outputs.group-checks }}
-      e2e: ${{ steps.plan.outputs.group-e2e }}
-      build: ${{ steps.plan.outputs.run-build }}
-      keys: ${{ steps.plan.outputs.keys }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -115,12 +111,10 @@ jobs:
 
   checks:
     name: unit checks (${{ matrix.id }})
-    needs: plan
-    if: needs.plan.outputs.checks != '[]'
     strategy:
       fail-fast: false
       matrix:
-        id: ${{ fromJSON(needs.plan.outputs.checks) }}
+        id: [effect-rules, codemode-pack, sdk-package, client-generated, protocol-generated]
     runs-on: outrun-linux-arm64
     defaults:
       run:
@@ -134,43 +128,52 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # outrun (ARK-81): this job starts beside the plan and looks its own command up; a recorded pass skips every step.
+      - name: Setup Bun (no install)
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - name: Look checks:${{ matrix.id }} up
+        id: look
+        run: .github/outrun/run lookup "checks:${{ matrix.id }}"
+
       - name: Setup Bun
+        if: steps.look.outputs.run == 'true'
         uses: ./.github/actions/setup-bun
 
       - name: Effect simplification rules
-        if: matrix.id == 'effect-rules'
+        if: ${{ steps.look.outputs.run == 'true' && (matrix.id == 'effect-rules') }}
         run: |
           bun run test:effect-simplification-rules
           bun run lint:effect-simplifications
 
       - name: Verify packed codemode package
-        if: matrix.id == 'codemode-pack'
+        if: ${{ steps.look.outputs.run == 'true' && (matrix.id == 'codemode-pack') }}
         working-directory: packages/codemode
         run: bun run pack
 
       - name: Verify packed workerd SDK
-        if: matrix.id == 'sdk-package'
+        if: ${{ steps.look.outputs.run == 'true' && (matrix.id == 'sdk-package') }}
         timeout-minutes: 15
         run: bun turbo verify:package --filter=@opencode/sdk
 
       - name: Check generated client
-        if: matrix.id == 'client-generated'
+        if: ${{ steps.look.outputs.run == 'true' && (matrix.id == 'client-generated') }}
         working-directory: packages/client
         run: bun run check:generated
 
       - name: Check generated OpenAPI document
-        if: matrix.id == 'protocol-generated'
+        if: ${{ steps.look.outputs.run == 'true' && (matrix.id == 'protocol-generated') }}
         working-directory: packages/protocol
         run: bun run check:generated
 
       - name: Record checks:${{ matrix.id }}
-        if: success()
-        run: .github/outrun/run record "checks:${{ matrix.id }}" --key "${{ fromJSON(needs.plan.outputs.keys)[format('checks:{0}', matrix.id)] }}" --since ${{ steps.start.outputs.at }}
+        if: success() && steps.look.outputs.run == 'true'
+        run: .github/outrun/run record "checks:${{ matrix.id }}" --key "${{ steps.look.outputs.key }}" --since ${{ steps.start.outputs.at }}
 
   build:
     name: build (linux)
-    needs: plan
-    if: needs.plan.outputs.build == 'true'
     runs-on: outrun-linux-arm64
     defaults:
       run:
@@ -184,10 +187,22 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # outrun (ARK-81): this job starts beside the plan and looks its own command up; a recorded pass skips every step.
+      - name: Setup Bun (no install)
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - name: Look build up
+        id: look
+        run: .github/outrun/run lookup "build"
+
       - name: Setup Bun
+        if: steps.look.outputs.run == 'true'
         uses: ./.github/actions/setup-bun
 
       - name: Verify compiled service lifecycle
+        if: steps.look.outputs.run == 'true'
         timeout-minutes: 10
         working-directory: packages/cli
         env:
@@ -200,7 +215,7 @@ jobs:
       # CLI and app closures hold every library a tested package depends on. The builds are tsc and Bun.build with no
       # platform-specific steps, and the libraries publish from Linux, so Windows skips them.
       - name: Build workspace libraries
-        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        if: ${{ steps.look.outputs.run == 'true' && (!cancelled() && runner.os == 'Linux') }}
         timeout-minutes: 10
         run: |
           bun turbo build --concurrency=3 --filter='@opencode/cli^...' --filter='@opencode/app^...'
@@ -209,13 +224,13 @@ jobs:
           TURBO_SCM_HEAD: ${{ github.sha }}
 
       - name: Setup Node build runtime
-        if: ${{ !cancelled() }}
+        if: ${{ steps.look.outputs.run == 'true' && (!cancelled()) }}
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "26.4.0"
 
       - name: Verify Node build
-        if: ${{ !cancelled() }}
+        if: ${{ steps.look.outputs.run == 'true' && (!cancelled()) }}
         timeout-minutes: 15
         working-directory: packages/cli
         env:
@@ -225,17 +240,15 @@ jobs:
           bun run script/service-smoke.ts --node
 
       - name: Record build
-        if: success()
-        run: .github/outrun/run record "build" --key "${{ fromJSON(needs.plan.outputs.keys)['build'] }}" --since ${{ steps.start.outputs.at }}
+        if: success() && steps.look.outputs.run == 'true'
+        run: .github/outrun/run record "build" --key "${{ steps.look.outputs.key }}" --since ${{ steps.start.outputs.at }}
 
   e2e-suite:
     name: e2e (linux, ${{ matrix.id }})
-    needs: plan
-    if: needs.plan.outputs.e2e != '[]'
     strategy:
       fail-fast: false
       matrix:
-        id: ${{ fromJSON(needs.plan.outputs.e2e) }}
+        id: [app-1, app-2, session-ui-components, app-components]
     runs-on: outrun-linux-arm64
     env:
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
@@ -251,22 +264,36 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # outrun (ARK-81): this job starts beside the plan and looks its own command up; a recorded pass skips every step.
+      - name: Setup Bun (no install)
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - name: Look e2e:${{ matrix.id }} up
+        id: look
+        run: .github/outrun/run lookup "e2e:${{ matrix.id }}"
+
       - name: Setup Node
+        if: steps.look.outputs.run == 'true'
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           # Playwright 1.59 hangs while extracting Chromium with Node 24.16.
           node-version: "24.15"
 
       - name: Setup Bun
+        if: steps.look.outputs.run == 'true'
         uses: ./.github/actions/setup-bun
 
       - name: Read Playwright version
+        if: steps.look.outputs.run == 'true'
         id: playwright-version
         run: |
           version=$(node -e 'console.log(require("./package.json").workspaces.catalog["@playwright/test"])')
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
+        if: steps.look.outputs.run == 'true'
         id: playwright-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
@@ -274,57 +301,55 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}-chromium
 
       - name: Install Playwright system dependencies
-        if: runner.os == 'Linux'
+        if: ${{ steps.look.outputs.run == 'true' && (runner.os == 'Linux') }}
         working-directory: packages/app
         run: bunx playwright install-deps chromium
 
       - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        if: ${{ steps.look.outputs.run == 'true' && (steps.playwright-cache.outputs.cache-hit != 'true') }}
         working-directory: packages/app
         run: bunx playwright install chromium
 
       - name: Run app e2e tests against production build
-        if: matrix.id == 'app-1' || matrix.id == 'app-2'
+        if: ${{ steps.look.outputs.run == 'true' && (matrix.id == 'app-1' || matrix.id == 'app-2') }}
         run: bun --cwd packages/app test:e2e:built --shard=${{ matrix.id == 'app-1' && '1/2' || '2/2' }}
         env:
           CI: true
         timeout-minutes: 15
 
       - name: Verify service worker precaching and upgrades
-        if: matrix.id == 'app-2'
+        if: ${{ steps.look.outputs.run == 'true' && (matrix.id == 'app-2') }}
         working-directory: packages/app
         run: bunx playwright test --config e2e/service-worker/playwright.config.ts
         timeout-minutes: 5
 
       - name: Run session UI component tests
-        if: matrix.id == 'session-ui-components'
+        if: ${{ steps.look.outputs.run == 'true' && (matrix.id == 'session-ui-components') }}
         run: bun --cwd packages/session-ui test:components
         env:
           CI: true
         timeout-minutes: 15
 
       - name: Run app component tests
-        if: matrix.id == 'app-components'
+        if: ${{ steps.look.outputs.run == 'true' && (matrix.id == 'app-components') }}
         run: bun --cwd packages/app test:components
         env:
           CI: true
         timeout-minutes: 15
 
       - name: Record e2e:${{ matrix.id }}
-        if: success()
-        run: .github/outrun/run record "e2e:${{ matrix.id }}" --key "${{ fromJSON(needs.plan.outputs.keys)[format('e2e:{0}', matrix.id)] }}" --since ${{ steps.start.outputs.at }}
+        if: success() && steps.look.outputs.run == 'true'
+        run: .github/outrun/run record "e2e:${{ matrix.id }}" --key "${{ steps.look.outputs.key }}" --since ${{ steps.start.outputs.at }}
 
   e2e:
     name: e2e (linux)
-    needs: [plan, e2e-suite]
+    needs: [e2e-suite]
     if: ${{ !cancelled() && !github.event.pull_request.draft }}
     runs-on: outrun-linux-arm64
     steps:
       - name: Check browser test results
         env:
-          PLAN: ${{ needs.plan.result }}
           SUITES: ${{ needs.e2e-suite.result }}
-          EXPECTED: ${{ needs.plan.outputs.e2e != '[]' && 'success' || 'skipped' }}
         run: |
-          echo "plan: $PLAN, browser test legs: $SUITES (expected $EXPECTED)"
-          test "$PLAN" = success && test "$SUITES" = "$EXPECTED"
+          echo "browser test legs: $SUITES"
+          test "$SUITES" = success
