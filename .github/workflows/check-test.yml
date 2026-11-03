@@ -103,6 +103,12 @@ jobs:
           git config --global user.email "bot@opencode.ai"
           git config --global user.name "opencode"
 
+      - name: Install ripgrep (ARK-81 bench, every variant: the tests need rg on PATH)
+        run: |
+          case "$(uname -m)" in x86_64) t=x86_64-unknown-linux-musl ;; *) t=aarch64-unknown-linux-gnu ;; esac
+          curl -fsSL "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-$t.tar.gz" | sudo tar -xz -C /usr/local/bin --strip-components=1 "ripgrep-15.1.0-$t/rg"
+          rg --version | head -1
+
       - name: Run unit tests
         timeout-minutes: 20
         run: |
