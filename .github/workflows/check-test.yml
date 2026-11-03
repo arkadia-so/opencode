@@ -31,7 +31,7 @@ jobs:
   affected:
     name: affected packages
     if: ${{ !github.event.pull_request.draft }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     outputs:
       e2e: ${{ steps.packages.outputs.app }}
     steps:
@@ -69,9 +69,7 @@ jobs:
       matrix:
         settings:
           - name: linux
-            host: blacksmith-4vcpu-ubuntu-2404
-          - name: windows
-            host: blacksmith-4vcpu-windows-2025
+            host: ubuntu-24.04
     runs-on: ${{ matrix.settings.host }}
     defaults:
       run:
@@ -155,9 +153,7 @@ jobs:
       matrix:
         settings:
           - name: linux
-            host: blacksmith-4vcpu-ubuntu-2404
-          - name: windows
-            host: blacksmith-4vcpu-windows-2025
+            host: ubuntu-24.04
     runs-on: ${{ matrix.settings.host }}
     defaults:
       run:
@@ -224,7 +220,7 @@ jobs:
       fail-fast: false
       matrix:
         # Beta PRs gate on Linux; Windows runs on pushes and manual runs (nightly-beta.yml dispatches beta).
-        settings: ${{ fromJSON(github.base_ref == 'beta' && '[{"name":"linux","host":"blacksmith-4vcpu-ubuntu-2404"}]' || '[{"name":"linux","host":"blacksmith-4vcpu-ubuntu-2404"},{"name":"windows","host":"blacksmith-4vcpu-windows-2025"}]') }}
+        settings: [{"name":"linux","host":"ubuntu-24.04"}]
         quarantine: ${{ fromJSON(inputs.quarantine && '[true]' || '[false]') }}
         # Playwright splits whole spec files across shards by test count, not duration. Every app-N
         # entry must use the same total, and the entries must cover 1..total. The service worker suite
@@ -335,8 +331,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [linux, windows]
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+        os: [linux]
+    runs-on: ubuntu-24.04
     steps:
       - name: Check browser test results
         env:
