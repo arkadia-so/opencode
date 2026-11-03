@@ -1,0 +1,22 @@
+name: cache-probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  probe:
+    runs-on: outrun-linux-arm64
+    steps:
+      - name: Probe turbo-cache latency (ARK-81)
+        run: |
+          URL=https://turbo-cache.arkadia.so
+          TOK=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$URL" | python3 -c 'import json,sys;print(json.load(sys.stdin)["value"])')
+          rnd() { python3 -c 'import secrets;print(secrets.token_hex(32))'; }
+          echo "== status"; curl -s -o /dev/null -w "%{http_code} %{time_total}\n" -H "authorization: Bearer $TOK" "$URL/v8/artifacts/status?slug=probe"
+          echo "== GET 404 x10 (sequential)"; for i in $(seq 10); do curl -s -o /dev/null -w "%{http_code} conn=%{time_connect} tls=%{time_appconnect} ttfb=%{time_starttransfer} total=%{time_total}\n" -H "authorization: Bearer $TOK" "$URL/v8/artifacts/$(rnd)?slug=probe"; done
+          body=$(python3 -c "import json,secrets;print(json.dumps({'hashes':[secrets.token_hex(32) for _ in range(100)]}))")
+          echo "== query 100 x5"; for i in $(seq 5); do curl -s -o /dev/null -w "%{http_code} ttfb=%{time_starttransfer} total=%{time_total}\n" -X POST -H "authorization: Bearer $TOK" -H "content-type: application/json" -d "$body" "$URL/v8/artifacts?slug=probe"; done
+          echo "== PUT x5"; for i in $(seq 5); do curl -s -o /dev/null -w "%{http_code} total=%{time_total}\n" -X PUT -H "authorization: Bearer $TOK" -H "content-type: application/octet-stream" --data-binary "x" "$URL/v8/artifacts/$(rnd)?slug=probe"; done
+          echo "== 16 parallel GETs"; s=$(date +%s.%N); for i in $(seq 16); do curl -s -o /dev/null -H "authorization: Bearer $TOK" "$URL/v8/artifacts/$(rnd)?slug=probe" & done; wait; echo "$(echo "$(date +%s.%N) - $s" | bc) s"
+          echo "== DNS"; getent hosts turbo-cache.arkadia.so; curl -s -o /dev/null -w "ip=%{remote_ip} total=%{time_total}\n" https://turbo-cache.arkadia.so/
