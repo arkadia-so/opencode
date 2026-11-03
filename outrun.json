@@ -1,0 +1,916 @@
+{
+  "inputs": [
+    "bun.lock",
+    "package.json",
+    "bunfig.toml",
+    ".npmrc",
+    "patches/**",
+    "tsconfig.json"
+  ],
+  "env": [
+    "CI",
+    "OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER"
+  ],
+  "trustedRef": "refs/heads/bench/engine",
+  "suites": [
+    {
+      "adapter": "bun",
+      "dir": "packages/ai",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "ai",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--timeout",
+        "30000",
+        "--only-failures"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/app",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "app:unit",
+      "tests": [
+        "src/**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "src/**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--conditions=solid",
+        "--only-failures",
+        "--isolate",
+        "--preload",
+        "../ui/test/solid-jsx.ts",
+        "--preload",
+        "./happydom.ts"
+      ],
+      "roots": [
+        "../ui/test/solid-jsx.ts",
+        "happydom.ts"
+      ]
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/app",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "app:browser",
+      "tests": [
+        "test-browser/**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "test-browser/**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--conditions=browser",
+        "--only-failures",
+        "--isolate",
+        "--preload",
+        "../ui/test/solid-jsx.ts",
+        "--preload",
+        "./happydom.ts"
+      ],
+      "roots": [
+        "../ui/test/solid-jsx.ts",
+        "happydom.ts"
+      ]
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/cli",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "cli",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--timeout",
+        "30000",
+        "--only-failures"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/client",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "client",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--timeout",
+        "5000"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/codemode",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "codemode",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/console/app",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "console/app",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--only-failures"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/core",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "core",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "run",
+        "script/test.ts"
+      ],
+      "roots": [
+        "script/test.ts",
+        "./test/preload.ts"
+      ]
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/desktop",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "desktop",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--timeout",
+        "30000"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/function",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "function",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/gui-plugins",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "gui-plugins",
+      "tests": [
+        "src/**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "src/**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test"
+      ],
+      "roots": [
+        "./happydom.ts"
+      ]
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/http-recorder",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "http-recorder",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--timeout",
+        "30000",
+        "--only-failures"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/httpapi-codegen",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "httpapi-codegen",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--timeout",
+        "5000",
+        "--only-failures"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/latex",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "latex",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--timeout",
+        "30000",
+        "--only-failures"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/merman",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "merman",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--timeout",
+        "30000",
+        "--only-failures"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/patchmark",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "patchmark",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--only-failures"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/plugin-browser",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "plugin-browser",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/plugin",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "plugin",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--only-failures"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/protocol",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "protocol",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--only-failures"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/schema",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "schema",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--only-failures"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/script",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "script",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/sdk",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "sdk",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--timeout",
+        "5000"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/server",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "server",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--only-failures"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/session-ui",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "session-ui",
+      "tests": [
+        "src/**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "src/**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--only-failures"
+      ],
+      "roots": [
+        "../ui/test/solid-jsx.ts"
+      ]
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/simulation",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "simulation",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--timeout",
+        "30000",
+        "--only-failures"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/stats/app",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "stats/app",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--only-failures"
+      ],
+      "roots": [
+        "../../ui/test/solid-jsx.ts"
+      ]
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/stats/core",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "stats/core",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--only-failures"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/stats/server",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "stats/server",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--only-failures"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/theme",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "theme",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--timeout",
+        "30000"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/tui",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "tui",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--timeout",
+        "30000",
+        "--only-failures"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/ui",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "ui",
+      "tests": [
+        "src/**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "src/**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--only-failures"
+      ],
+      "roots": [
+        "./test/solid-jsx.ts"
+      ]
+    },
+    {
+      "adapter": "bun",
+      "dir": "packages/util",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "util",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test",
+        "--only-failures"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "services/changelog",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "services/changelog",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test"
+      ],
+      "roots": []
+    },
+    {
+      "adapter": "bun",
+      "dir": "services/update",
+      "inputs": [
+        "**/*",
+        "!**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}",
+        "!**/*.md"
+      ],
+      "env": [],
+      "name": "services/update",
+      "tests": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/*_{test,spec}.{ts,tsx,js,jsx}"
+      ],
+      "run": [
+        "bun",
+        "test"
+      ],
+      "roots": []
+    }
+  ],
+  "commands": [
+    {
+      "name": "checks:effect-rules",
+      "run": "bun run test:effect-simplification-rules && bun run lint:effect-simplifications",
+      "inputs": [
+        "script/ast-grep/**",
+        "packages/**/*.ts",
+        "packages/**/*.tsx"
+      ]
+    },
+    {
+      "name": "checks:codemode-pack",
+      "run": "bun run pack (packages/codemode)",
+      "inputs": [
+        "packages/codemode/**"
+      ],
+      "roots": [
+        "packages/codemode/**/*.ts",
+        "packages/codemode/**/*.tsx"
+      ]
+    },
+    {
+      "name": "checks:sdk-package",
+      "run": "bun turbo verify:package --filter=@opencode/sdk",
+      "inputs": [
+        "packages/sdk/**",
+        "packages/*/package.json",
+        "packages/*/tsconfig*.json"
+      ],
+      "roots": [
+        "packages/sdk/**/*.ts",
+        "packages/sdk/**/*.tsx"
+      ]
+    },
+    {
+      "name": "checks:client-generated",
+      "run": "bun run check:generated (packages/client)",
+      "inputs": [
+        "packages/client/**"
+      ],
+      "roots": [
+        "packages/client/**/*.ts",
+        "packages/client/**/*.tsx"
+      ]
+    },
+    {
+      "name": "checks:protocol-generated",
+      "run": "bun run check:generated (packages/protocol)",
+      "inputs": [
+        "packages/protocol/**"
+      ],
+      "roots": [
+        "packages/protocol/**/*.ts",
+        "packages/protocol/**/*.tsx"
+      ]
+    },
+    {
+      "name": "build",
+      "run": "cli build --single + service-smoke; turbo build cli^... app^...; node build + smoke",
+      "inputs": [
+        "packages/*/package.json",
+        "packages/*/tsconfig*.json",
+        "packages/*/script/**",
+        "packages/cli/**",
+        "packages/app/**",
+        "packages/ui/**"
+      ],
+      "roots": [
+        "packages/cli/**/*.ts",
+        "packages/cli/**/*.tsx",
+        "packages/app/**/*.ts",
+        "packages/app/**/*.tsx"
+      ]
+    },
+    {
+      "name": "e2e:app-1",
+      "run": "bun --cwd packages/app test:e2e:built --shard=1/2",
+      "inputs": [
+        "packages/app/**",
+        "packages/ui/**",
+        "packages/session-ui/**"
+      ],
+      "roots": [
+        "packages/app/**/*.ts",
+        "packages/app/**/*.tsx"
+      ]
+    },
+    {
+      "name": "e2e:app-2",
+      "run": "bun --cwd packages/app test:e2e:built --shard=2/2",
+      "inputs": [
+        "packages/app/**",
+        "packages/ui/**",
+        "packages/session-ui/**"
+      ],
+      "roots": [
+        "packages/app/**/*.ts",
+        "packages/app/**/*.tsx"
+      ]
+    },
+    {
+      "name": "e2e:session-ui-components",
+      "run": "bun --cwd packages/session-ui test:components",
+      "inputs": [
+        "packages/session-ui/**",
+        "packages/stories/**",
+        "packages/ui/**"
+      ],
+      "roots": [
+        "packages/session-ui/**/*.ts",
+        "packages/session-ui/**/*.tsx",
+        "packages/stories/**/*.ts",
+        "packages/stories/**/*.tsx"
+      ]
+    },
+    {
+      "name": "e2e:app-components",
+      "run": "bun --cwd packages/app test:components",
+      "inputs": [
+        "packages/app/**",
+        "packages/stories/**",
+        "packages/ui/**"
+      ],
+      "roots": [
+        "packages/app/**/*.ts",
+        "packages/app/**/*.tsx",
+        "packages/stories/**/*.ts",
+        "packages/stories/**/*.tsx"
+      ]
+    },
+    {
+      "name": "typecheck",
+      "run": "bun run lint && bun run typecheck:tsc",
+      "inputs": [
+        "**/*.ts",
+        "**/*.tsx",
+        "**/tsconfig*.json",
+        "**/package.json",
+        "**/.oxlintrc*",
+        "**/oxlint*"
+      ]
+    }
+  ]
+}
