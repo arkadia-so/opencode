@@ -12,6 +12,11 @@ concurrency:
   group: ${{ case(github.ref == 'refs/heads/dev', format('{0}-{1}', github.workflow, github.run_id), format('{0}-{1}', github.workflow, github.event.pull_request.number || github.ref)) }}
   cancel-in-progress: true
 
+env:
+  OUTRUN_CACHE_URL: https://turbo-cache.arkadia.so
+  OUTRUN_CACHE_TEAM: outrun
+  OUTRUN: ${{ github.workspace }}/.github/outrun/outrun.js
+
 jobs:
   check:
     name: typecheck
@@ -24,15 +29,36 @@ jobs:
           # A pull request checks out its merge into the current base; the first parent is that base.
           fetch-depth: 2
 
+      - name: Start
+        id: start
+        run: echo "at=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      # outrun (ARK-81): lint and typecheck are one command unit; a recorded pass of the same inputs skips them.
+      - name: Setup Bun (no install)
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - name: Plan
+        id: plan
+        run: bun "$OUTRUN" plan --out "$RUNNER_TEMP/plan.json"
+
       - name: Setup Bun
+        if: steps.plan.outputs.run-typecheck == 'true' || github.event_name == 'pull_request'
         uses: ./.github/actions/setup-bun
 
       - name: Lint
+        if: steps.plan.outputs.run-typecheck == 'true'
         run: bun run lint
 
       # Local `bun run check` uses `bun check`; CI keeps the official TypeScript compiler as the source of truth.
       - name: Typecheck (TypeScript 7.1)
+        if: steps.plan.outputs.run-typecheck == 'true'
         run: bun run typecheck:tsc
+
+      - name: Record typecheck
+        if: steps.plan.outputs.run-typecheck == 'true'
+        run: bun "$OUTRUN" record typecheck --since ${{ steps.start.outputs.at }}
 
       # Every GUI package file (app, desktop, gui-plugins, the plugin package's GUI SDK, ui, session-ui) a pull request adds or edits must be free of
       # oxlint problems, warn-level rules (anti-slop) included. Other packages are not affected.

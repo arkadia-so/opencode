@@ -23,54 +23,59 @@ concurrency:
 permissions:
   contents: read
   checks: write
+  id-token: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  OUTRUN_CACHE_URL: https://turbo-cache.arkadia.so
+  OUTRUN_CACHE_TEAM: outrun
+  OUTRUN: ${{ github.workspace }}/.github/outrun/outrun.js
 
 jobs:
-  affected:
-    name: affected packages
+  # outrun (ARK-81): every unit is looked up once here. The test shards, the checks, the build and the browser suites
+  # start only for what missed; when everything hit, no other job starts.
+  plan:
+    name: plan
     if: ${{ !github.event.pull_request.draft }}
     runs-on: outrun-linux-arm64
     outputs:
-      e2e: ${{ steps.packages.outputs.app }}
+      runners: ${{ steps.plan.outputs.runners }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+      checks: ${{ steps.plan.outputs.group-checks }}
+      e2e: ${{ steps.plan.outputs.group-e2e }}
+      build: ${{ steps.plan.outputs.run-build }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          # Pull requests diff against the merge's first parent; pushes diff against the previous dev head.
-          fetch-depth: ${{ github.event_name == 'pull_request' && 2 || 0 }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: package.json
 
-      - name: Find affected packages
-        id: packages
-        env:
-          TURBO_SCM_BASE: ${{ github.event_name == 'pull_request' && format('{0}^1', github.sha) || github.event.before }}
-          TURBO_SCM_HEAD: ${{ github.sha }}
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "app=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # packages/stories hosts the component tests, but no app package depends on it.
-          bun x turbo@2.10.2 ls --affected --filter=@opencode/app --filter=@opencode/stories --output=json > affected.json
-          bun -e 'const result = await Bun.file("affected.json").json(); console.log(`app=${result.packages.count > 0}`)' >> "$GITHUB_OUTPUT"
+      - name: Plan
+        id: plan
+        run: bun "$OUTRUN" plan --out plan.json --max-runners 8 --target 60 --start 60 --slots 4
+
+      - name: Upload the plan
+        if: steps.plan.outputs.runners != '0'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: outrun-plan
+          path: plan.json
+          retention-days: 1
 
   unit:
-    name: unit (${{ matrix.settings.name }})
-    if: ${{ !inputs.quarantine && !github.event.pull_request.draft }}
+    name: unit (${{ matrix.shard }}/${{ needs.plan.outputs.runners }})
+    needs: plan
+    if: needs.plan.outputs.runners != '0'
     strategy:
       fail-fast: false
       matrix:
-        settings:
-          - name: linux
-            host: outrun-linux-arm64
-    runs-on: ${{ matrix.settings.host }}
+        shard: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: outrun-linux-arm64
     defaults:
       run:
         shell: bash
@@ -79,98 +84,101 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          # Pull requests diff against the merge's first parent; pushes diff against the previous dev head.
-          fetch-depth: ${{ github.event_name == 'pull_request' && 2 || 0 }}
-
-      - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: "24"
 
       - name: Setup Bun
         uses: ./.github/actions/setup-bun
-
-      - name: Test Effect simplification rules
-        if: runner.os == 'Linux'
-        run: bun run test:effect-simplification-rules
-
-      - name: Check Effect simplifications
-        if: runner.os == 'Linux'
-        run: bun run lint:effect-simplifications
 
       - name: Configure git identity
         run: |
           git config --global user.email "bot@opencode.ai"
           git config --global user.name "opencode"
 
-      - name: Install ripgrep (ARK-81 bench, every variant: the tests need rg on PATH)
+      - name: Install ripgrep (ARK-81 bench, every variant, the tests need rg on PATH)
         run: |
           case "$(uname -m)" in x86_64) t=x86_64-unknown-linux-musl ;; *) t=aarch64-unknown-linux-gnu ;; esac
           curl -fsSL "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-$t.tar.gz" | sudo tar -xz -C /usr/local/bin --strip-components=1 "ripgrep-15.1.0-$t/rg"
-          rg --version | head -1
+
+      - name: Download the plan
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: outrun-plan
 
       - name: Run unit tests
         timeout-minutes: 20
-        run: |
-          # The runners have four vCPUs, and each Bun test process performs its own concurrent work.
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            GITHUB_ACTIONS=false bun turbo test --concurrency=3
-            exit 0
-          fi
-          GITHUB_ACTIONS=false bun turbo test --affected --concurrency=3
+        run: bun "$OUTRUN" test --plan plan.json --shard ${{ matrix.shard }}/${{ needs.plan.outputs.runners }} --summary summary.json
         env:
-          OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: ${{ runner.os == 'Windows' && 'true' || 'false' }}
-          TURBO_SCM_BASE: ${{ github.event_name == 'pull_request' && format('{0}^1', github.sha) || github.event.before }}
-          TURBO_SCM_HEAD: ${{ github.sha }}
+          OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: "false"
 
-      - name: Verify packed codemode package
-        if: runner.os == 'Linux'
-        working-directory: packages/codemode
-        run: bun run pack
-
-      - name: Verify packed workerd SDK
-        if: runner.os == 'Linux'
-        timeout-minutes: 15
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            bun turbo verify:package --filter=@opencode/sdk
-            exit 0
-          fi
-          bun turbo verify:package --affected --filter=@opencode/sdk
-        env:
-          TURBO_SCM_BASE: ${{ github.event_name == 'pull_request' && format('{0}^1', github.sha) || github.event.before }}
-          TURBO_SCM_HEAD: ${{ github.sha }}
-
-      - name: Check generated client
-        if: runner.os == 'Linux'
-        working-directory: packages/client
-        run: bun run check:generated
-
-      - name: Check generated OpenAPI document
-        if: runner.os == 'Linux'
-        working-directory: packages/protocol
-        run: bun run check:generated
-
-  build:
-    name: build (${{ matrix.settings.name }})
-    if: ${{ !inputs.quarantine && !github.event.pull_request.draft }}
+  checks:
+    name: unit checks (${{ matrix.id }})
+    needs: plan
+    if: needs.plan.outputs.checks != '[]'
     strategy:
       fail-fast: false
       matrix:
-        settings:
-          - name: linux
-            host: outrun-linux-arm64
-    runs-on: ${{ matrix.settings.host }}
+        id: ${{ fromJSON(needs.plan.outputs.checks) }}
+    runs-on: outrun-linux-arm64
     defaults:
       run:
         shell: bash
     steps:
+      - name: Start
+        id: start
+        run: echo "at=$(date +%s)" >> "$GITHUB_OUTPUT"
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          # Pull requests diff against the merge's first parent; pushes diff against the previous dev head.
-          fetch-depth: ${{ github.event_name == 'pull_request' && 2 || 0 }}
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Effect simplification rules
+        if: matrix.id == 'effect-rules'
+        run: |
+          bun run test:effect-simplification-rules
+          bun run lint:effect-simplifications
+
+      - name: Verify packed codemode package
+        if: matrix.id == 'codemode-pack'
+        working-directory: packages/codemode
+        run: bun run pack
+
+      - name: Verify packed workerd SDK
+        if: matrix.id == 'sdk-package'
+        timeout-minutes: 15
+        run: bun turbo verify:package --filter=@opencode/sdk
+
+      - name: Check generated client
+        if: matrix.id == 'client-generated'
+        working-directory: packages/client
+        run: bun run check:generated
+
+      - name: Check generated OpenAPI document
+        if: matrix.id == 'protocol-generated'
+        working-directory: packages/protocol
+        run: bun run check:generated
+
+      - name: Record checks:${{ matrix.id }}
+        if: success()
+        run: bun "$OUTRUN" record "checks:${{ matrix.id }}" --since ${{ steps.start.outputs.at }}
+
+  build:
+    name: build (linux)
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    runs-on: outrun-linux-arm64
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Start
+        id: start
+        run: echo "at=$(date +%s)" >> "$GITHUB_OUTPUT"
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Bun
         uses: ./.github/actions/setup-bun
@@ -191,11 +199,7 @@ jobs:
         if: ${{ !cancelled() && runner.os == 'Linux' }}
         timeout-minutes: 10
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            bun turbo build --concurrency=3 --filter='@opencode/cli^...' --filter='@opencode/app^...'
-            exit 0
-          fi
-          bun turbo build --affected --concurrency=3 --filter='@opencode/cli^...' --filter='@opencode/app^...'
+          bun turbo build --concurrency=3 --filter='@opencode/cli^...' --filter='@opencode/app^...'
         env:
           TURBO_SCM_BASE: ${{ github.event_name == 'pull_request' && format('{0}^1', github.sha) || github.event.before }}
           TURBO_SCM_HEAD: ${{ github.sha }}
@@ -216,39 +220,28 @@ jobs:
           bun run script/build-node.ts --single --skip-install --outdir=dist/node
           bun run script/service-smoke.ts --node
 
+      - name: Record build
+        if: success()
+        run: bun "$OUTRUN" record "build" --since ${{ steps.start.outputs.at }}
+
   e2e-suite:
-    name: e2e (${{ matrix.settings.name }}, ${{ matrix.suite.id }}${{ matrix.quarantine && ', quarantine' || '' }})
-    needs: affected
-    if: needs.affected.outputs.e2e == 'true'
-    # Quarantined tests are known red; their legs report without failing the e2e checks.
-    continue-on-error: ${{ matrix.quarantine }}
+    name: e2e (linux, ${{ matrix.id }})
+    needs: plan
+    if: needs.plan.outputs.e2e != '[]'
     strategy:
       fail-fast: false
       matrix:
-        # Beta PRs gate on Linux; Windows runs on pushes and manual runs (nightly-beta.yml dispatches beta).
-        settings: [{"name":"linux","host":"outrun-linux-arm64"}]
-        quarantine: ${{ fromJSON(inputs.quarantine && '[true]' || '[false]') }}
-        # Playwright splits whole spec files across shards by test count, not duration. Every app-N
-        # entry must use the same total, and the entries must cover 1..total. The service worker suite
-        # reuses shard 2's production build. Each component suite runs once per OS in its own leg, so the
-        # two suites' story servers and test time are not added up on one runner.
-        suite:
-          - id: app-1
-            shard: 1/2
-          - id: app-2
-            shard: 2/2
-          - id: session-ui-components
-          - id: app-components
-    runs-on: ${{ matrix.settings.host }}
+        id: ${{ fromJSON(needs.plan.outputs.e2e) }}
+    runs-on: outrun-linux-arm64
     env:
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
-      # Beta only (packages/app/e2e/QUARANTINE.md): gate legs skip quarantined tests, retry once and stop after 8
-      # failures; quarantine legs run only those tests, to the end. Other branches keep the config defaults.
-      PLAYWRIGHT_ARGS: ${{ matrix.quarantine && '--grep @quarantine --pass-with-no-tests --retries=1' || (github.base_ref == 'beta' || github.ref == 'refs/heads/beta') && '--grep-invert @quarantine --max-failures=8 --retries=1' || '' }}
     defaults:
       run:
         shell: bash
     steps:
+      - name: Start
+        id: start
+        run: echo "at=$(date +%s)" >> "$GITHUB_OUTPUT"
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -287,68 +280,47 @@ jobs:
         run: bunx playwright install chromium
 
       - name: Run app e2e tests against production build
-        if: matrix.suite.shard
-        run: bun --cwd packages/app test:e2e:built --shard=${{ matrix.suite.shard }} ${{ env.PLAYWRIGHT_ARGS }}
+        if: matrix.id == 'app-1' || matrix.id == 'app-2'
+        run: bun --cwd packages/app test:e2e:built --shard=${{ matrix.id == 'app-1' && '1/2' || '2/2' }}
         env:
           CI: true
-        timeout-minutes: ${{ (matrix.quarantine || github.base_ref == 'beta' || github.ref == 'refs/heads/beta') && 10 || 15 }}
+        timeout-minutes: 15
 
       - name: Verify service worker precaching and upgrades
-        if: matrix.suite.shard == '2/2' && !matrix.quarantine
+        if: matrix.id == 'app-2'
         working-directory: packages/app
         run: bunx playwright test --config e2e/service-worker/playwright.config.ts
         timeout-minutes: 5
 
       - name: Run session UI component tests
-        if: matrix.suite.id == 'session-ui-components'
-        run: bun --cwd packages/session-ui test:components ${{ env.PLAYWRIGHT_ARGS }}
+        if: matrix.id == 'session-ui-components'
+        run: bun --cwd packages/session-ui test:components
         env:
           CI: true
-        timeout-minutes: ${{ (matrix.quarantine || github.base_ref == 'beta' || github.ref == 'refs/heads/beta') && 10 || 15 }}
+        timeout-minutes: 15
 
       - name: Run app component tests
-        if: matrix.suite.id == 'app-components'
-        run: bun --cwd packages/app test:components ${{ env.PLAYWRIGHT_ARGS }}
+        if: matrix.id == 'app-components'
+        run: bun --cwd packages/app test:components
         env:
           CI: true
-        timeout-minutes: ${{ (matrix.quarantine || github.base_ref == 'beta' || github.ref == 'refs/heads/beta') && 10 || 15 }}
+        timeout-minutes: 15
 
-      - name: Upload Playwright artifacts
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: playwright-${{ matrix.settings.name }}-${{ matrix.suite.id }}${{ matrix.quarantine && '-quarantine' || '' }}-${{ github.run_attempt }}
-          if-no-files-found: ignore
-          retention-days: 7
-          path: |
-            packages/app/e2e/test-results
-            packages/app/e2e/playwright-report
-            packages/session-ui/component-tests/test-results
-            packages/session-ui/component-tests/playwright-report
-            packages/app/component-tests/test-results
-            packages/app/component-tests/playwright-report
+      - name: Record e2e:${{ matrix.id }}
+        if: success()
+        run: bun "$OUTRUN" record "e2e:${{ matrix.id }}" --since ${{ steps.start.outputs.at }}
 
-  # Branch rules require one e2e check per OS. These keep those names and pass only when every
-  # leg above passed, or when no leg was needed; a failing leg on either OS fails both checks.
   e2e:
-    name: e2e (${{ matrix.os }})
-    needs: [affected, e2e-suite]
-    if: ${{ !cancelled() && !inputs.quarantine && !github.event.pull_request.draft }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [linux]
+    name: e2e (linux)
+    needs: [plan, e2e-suite]
+    if: ${{ !cancelled() && !github.event.pull_request.draft }}
     runs-on: outrun-linux-arm64
     steps:
       - name: Check browser test results
         env:
-          AFFECTED: ${{ needs.affected.result }}
+          PLAN: ${{ needs.plan.result }}
           SUITES: ${{ needs.e2e-suite.result }}
-          EXPECTED: ${{ needs.affected.outputs.e2e == 'true' && 'success' || 'skipped' }}
+          EXPECTED: ${{ needs.plan.outputs.e2e != '[]' && 'success' || 'skipped' }}
         run: |
-          if [ "${{ matrix.os }}" = windows ] && [ "${{ github.base_ref }}" = beta ]; then
-            echo "Windows browser tests run on beta pushes and nightly, not on beta pull requests"
-            exit 0
-          fi
-          echo "affected packages: $AFFECTED, browser test legs: $SUITES (expected $EXPECTED)"
-          test "$AFFECTED" = success && test "$SUITES" = "$EXPECTED"
+          echo "plan: $PLAN, browser test legs: $SUITES (expected $EXPECTED)"
+          test "$PLAN" = success && test "$SUITES" = "$EXPECTED"
