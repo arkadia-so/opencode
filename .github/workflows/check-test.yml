@@ -29,7 +29,6 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   OUTRUN_CACHE_URL: https://turbo-cache.arkadia.so
   OUTRUN_CACHE_TEAM: outrun
-  OUTRUN: ${{ github.workspace }}/.github/outrun/outrun.js
 
 jobs:
   # outrun (ARK-81): every unit is looked up once here. The test shards, the checks, the build and the browser suites
@@ -57,7 +56,7 @@ jobs:
 
       - name: Plan
         id: plan
-        run: bun "$OUTRUN" plan --out plan.json --max-runners 8 --target 60 --start 60 --slots 4
+        run: "$GITHUB_WORKSPACE/.github/outrun/run" plan --out plan.json --max-runners 8 --target 60 --start 60 --slots 4
 
       - name: Upload the plan
         if: steps.plan.outputs.runners != '0'
@@ -105,7 +104,7 @@ jobs:
 
       - name: Run unit tests
         timeout-minutes: 20
-        run: bun "$OUTRUN" test --plan plan.json --shard ${{ matrix.shard }}/${{ needs.plan.outputs.runners }} --summary summary.json
+        run: "$GITHUB_WORKSPACE/.github/outrun/run" test --plan plan.json --shard ${{ matrix.shard }}/${{ needs.plan.outputs.runners }} --summary summary.json
         env:
           OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: "false"
 
@@ -161,7 +160,7 @@ jobs:
 
       - name: Record checks:${{ matrix.id }}
         if: success()
-        run: bun "$OUTRUN" record "checks:${{ matrix.id }}" --since ${{ steps.start.outputs.at }}
+        run: "$GITHUB_WORKSPACE/.github/outrun/run" record "checks:${{ matrix.id }}" --since ${{ steps.start.outputs.at }}
 
   build:
     name: build (linux)
@@ -222,7 +221,7 @@ jobs:
 
       - name: Record build
         if: success()
-        run: bun "$OUTRUN" record "build" --since ${{ steps.start.outputs.at }}
+        run: "$GITHUB_WORKSPACE/.github/outrun/run" record "build" --since ${{ steps.start.outputs.at }}
 
   e2e-suite:
     name: e2e (linux, ${{ matrix.id }})
@@ -308,7 +307,7 @@ jobs:
 
       - name: Record e2e:${{ matrix.id }}
         if: success()
-        run: bun "$OUTRUN" record "e2e:${{ matrix.id }}" --since ${{ steps.start.outputs.at }}
+        run: "$GITHUB_WORKSPACE/.github/outrun/run" record "e2e:${{ matrix.id }}" --since ${{ steps.start.outputs.at }}
 
   e2e:
     name: e2e (linux)

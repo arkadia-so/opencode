@@ -15,7 +15,6 @@ concurrency:
 env:
   OUTRUN_CACHE_URL: https://turbo-cache.arkadia.so
   OUTRUN_CACHE_TEAM: outrun
-  OUTRUN: ${{ github.workspace }}/.github/outrun/outrun.js
 
 jobs:
   check:
@@ -41,7 +40,7 @@ jobs:
 
       - name: Plan
         id: plan
-        run: bun "$OUTRUN" plan --out "$RUNNER_TEMP/plan.json"
+        run: "$GITHUB_WORKSPACE/.github/outrun/run" plan --out "$RUNNER_TEMP/plan.json"
 
       - name: Setup Bun
         if: steps.plan.outputs.run-typecheck == 'true' || github.event_name == 'pull_request'
@@ -58,7 +57,7 @@ jobs:
 
       - name: Record typecheck
         if: steps.plan.outputs.run-typecheck == 'true'
-        run: bun "$OUTRUN" record typecheck --since ${{ steps.start.outputs.at }}
+        run: "$GITHUB_WORKSPACE/.github/outrun/run" record typecheck --since ${{ steps.start.outputs.at }}
 
       # Every GUI package file (app, desktop, gui-plugins, the plugin package's GUI SDK, ui, session-ui) a pull request adds or edits must be free of
       # oxlint problems, warn-level rules (anti-slop) included. Other packages are not affected.
