@@ -1,6 +1,7 @@
 name: cache-probe
 on:
-  workflow_dispatch:
+  push:
+    branches: [bench/probe]
 permissions:
   contents: read
   id-token: write
