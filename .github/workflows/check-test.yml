@@ -29,6 +29,8 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   OUTRUN_CACHE_URL: https://turbo-cache.arkadia.so
   OUTRUN_CACHE_TEAM: outrun
+  # Set for the unit tests upstream; workflow-wide here so the plan job keys units with the same value.
+  OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: "false"
 
 jobs:
   # outrun (ARK-81): every unit is looked up once here. The test shards, the checks, the build and the browser suites
@@ -105,8 +107,6 @@ jobs:
       - name: Run unit tests
         timeout-minutes: 20
         run: .github/outrun/run test --plan plan.json --shard ${{ matrix.shard }}/${{ needs.plan.outputs.runners }} --summary summary.json
-        env:
-          OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: "false"
 
   checks:
     name: unit checks (${{ matrix.id }})
