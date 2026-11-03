@@ -62,7 +62,7 @@ jobs:
 
       - name: Record typecheck
         if: steps.plan.outputs.run-typecheck == 'true'
-        run: .github/outrun/run record typecheck --since ${{ steps.start.outputs.at }}
+        run: .github/outrun/run record typecheck --key "${{ fromJSON(steps.plan.outputs.keys).typecheck }}" --since ${{ steps.start.outputs.at }}
 
       # Every GUI package file (app, desktop, gui-plugins, the plugin package's GUI SDK, ui, session-ui) a pull request adds or edits must be free of
       # oxlint problems, warn-level rules (anti-slop) included. Other packages are not affected.

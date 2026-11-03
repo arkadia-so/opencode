@@ -49,6 +49,7 @@ jobs:
       checks: ${{ steps.plan.outputs.group-checks }}
       e2e: ${{ steps.plan.outputs.group-e2e }}
       build: ${{ steps.plan.outputs.run-build }}
+      keys: ${{ steps.plan.outputs.keys }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -62,7 +63,7 @@ jobs:
 
       - name: Plan
         id: plan
-        run: .github/outrun/run plan --out plan.json --max-runners 8 --target 60 --start 60 --slots 4
+        run: .github/outrun/run plan --out plan.json --max-runners 8 --target 150 --start 60 --slots 4
 
       - name: Upload the plan
         if: steps.plan.outputs.runners != '0'
@@ -164,7 +165,7 @@ jobs:
 
       - name: Record checks:${{ matrix.id }}
         if: success()
-        run: .github/outrun/run record "checks:${{ matrix.id }}" --since ${{ steps.start.outputs.at }}
+        run: .github/outrun/run record "checks:${{ matrix.id }}" --key "${{ fromJSON(needs.plan.outputs.keys)[format('checks:{0}', matrix.id)] }}" --since ${{ steps.start.outputs.at }}
 
   build:
     name: build (linux)
@@ -225,7 +226,7 @@ jobs:
 
       - name: Record build
         if: success()
-        run: .github/outrun/run record "build" --since ${{ steps.start.outputs.at }}
+        run: .github/outrun/run record "build" --key "${{ fromJSON(needs.plan.outputs.keys)['build'] }}" --since ${{ steps.start.outputs.at }}
 
   e2e-suite:
     name: e2e (linux, ${{ matrix.id }})
@@ -311,7 +312,7 @@ jobs:
 
       - name: Record e2e:${{ matrix.id }}
         if: success()
-        run: .github/outrun/run record "e2e:${{ matrix.id }}" --since ${{ steps.start.outputs.at }}
+        run: .github/outrun/run record "e2e:${{ matrix.id }}" --key "${{ fromJSON(needs.plan.outputs.keys)[format('e2e:{0}', matrix.id)] }}" --since ${{ steps.start.outputs.at }}
 
   e2e:
     name: e2e (linux)
