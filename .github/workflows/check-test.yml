@@ -59,7 +59,7 @@ jobs:
 
       - name: Plan
         id: plan
-        run: .github/outrun/run plan --out plan.json --max-runners 8 --target 150 --start 60 --slots 4
+        run: .github/outrun/run plan --out plan.json --max-runners 3 --target 150 --start 60 --slots 4
 
       - name: Upload the plan
         if: steps.plan.outputs.runners != '0'
@@ -113,6 +113,7 @@ jobs:
     name: unit checks (${{ matrix.id }})
     strategy:
       fail-fast: false
+      max-parallel: 2 # ARK-81: about 8 Linux VMs per run at most
       matrix:
         id: [effect-rules, codemode-pack, sdk-package, client-generated, protocol-generated]
     runs-on: outrun-linux-arm64
@@ -247,6 +248,7 @@ jobs:
     name: e2e (linux, ${{ matrix.id }})
     strategy:
       fail-fast: false
+      max-parallel: 3 # ARK-81: about 8 Linux VMs per run at most
       matrix:
         id: [app-1, app-2, session-ui-components, app-components]
     runs-on: outrun-linux-arm64
